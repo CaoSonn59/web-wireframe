@@ -1,104 +1,82 @@
 import { useState } from 'react';
 import {
   Square, RectangleHorizontal, Type, MousePointer2, Image,
-  Trash2, Monitor, Group, Ungroup,
-  ChevronsUp, ChevronsDown, X, GripVertical, Magnet,
-  Circle, Triangle,
+  Trash2, Monitor, ChevronsUp, ChevronsDown, X, GripVertical,
+  Circle, Triangle, Search,
 } from 'lucide-react';
 import { ELEMENT_CONFIG } from './ArtboardElement';
+import { FA_ICONS } from '../data/faIcons';
 
 const SIDEBAR_TOOLS = [
-  { type: 'large_block',       label: 'Large Rectangle',   icon: RectangleHorizontal, preview: 'bg-slate-200',                                      iconColor: 'text-slate-500' },
-  { type: 'small_block',       label: 'Small Rectangle',   icon: Square,              preview: 'bg-slate-200',                                      iconColor: 'text-slate-500' },
-  { type: 'text_placeholder',  label: 'Text Placeholder',  icon: Type,                preview: 'bg-amber-50 border border-amber-200',               iconColor: 'text-amber-400' },
+  { type: 'large_block',       label: 'Large Rect',        icon: RectangleHorizontal, preview: 'bg-slate-200',                                      iconColor: 'text-slate-500' },
+  { type: 'small_block',       label: 'Small Rect',        icon: Square,              preview: 'bg-slate-200',                                      iconColor: 'text-slate-500' },
+  { type: 'text_placeholder',  label: 'Text',              icon: Type,                preview: 'bg-amber-50 border border-amber-200',               iconColor: 'text-amber-400' },
   { type: 'button',            label: 'Button',            icon: MousePointer2,       preview: 'bg-blue-500',                                       iconColor: 'text-white'     },
-  { type: 'image_placeholder', label: 'Image Placeholder', icon: Image,               preview: 'bg-slate-100 border border-dashed border-slate-300', iconColor: 'text-slate-400' },
+  { type: 'image_placeholder', label: 'Image',             icon: Image,               preview: 'bg-slate-100 border border-dashed border-slate-300', iconColor: 'text-slate-400' },
   { type: 'circle',            label: 'Circle',            icon: Circle,              preview: 'bg-slate-200',                                      iconColor: 'text-slate-500' },
   { type: 'triangle',          label: 'Triangle',          icon: Triangle,            preview: 'bg-slate-200',                                      iconColor: 'text-slate-500' },
 ];
 
 const TYPE_ICONS = {
-  large_block:       RectangleHorizontal,
-  small_block:       Square,
-  text_placeholder:  Type,
-  button:            MousePointer2,
-  image_placeholder: Image,
-  circle:            Circle,
-  triangle:          Triangle,
+  large_block: RectangleHorizontal, small_block: Square,
+  text_placeholder: Type, button: MousePointer2,
+  image_placeholder: Image, circle: Circle, triangle: Triangle,
+  fa_icon: Square,
 };
 
 export default function Sidebar({
   boardSize, elements, selectedIds,
   onSelect, onClearAll, onChangeScreen,
-  onGroup, onUngroup, onLayerMove, onDeleteElement, onLayerReorder,
-  snapEnabled, onToggleSnap,
+  onLayerMove, onDeleteElement, onLayerReorder,
 }) {
-  // ── Drag-to-reorder state ──────────────────────────────────
-  // targetId: which layer row the cursor is over
-  // position: 'above' | 'below' — which half of the row
+  const [iconSearch, setIconSearch] = useState('');
   const [dropInfo, setDropInfo] = useState({ draggedId: null, targetId: null, position: null });
 
-  const handleToolDragStart = (e, type) => {
+  const handleToolDragStart = (e, type, extra = {}) => {
     e.dataTransfer.setData('elementType', type);
+    Object.entries(extra).forEach(([k, v]) => e.dataTransfer.setData(k, v));
     e.dataTransfer.effectAllowed = 'copy';
   };
 
   const handleChangeScreen = () => {
-    if (window.confirm('Are you sure you want to change the screen?\nYour current design will be cleared.')) {
-      onChangeScreen();
-    }
+    if (window.confirm('Change screen? Current design will be cleared.')) onChangeScreen();
   };
 
-  const selectedEls = elements.filter(el => selectedIds.has(el.id));
-  const canGroup    = selectedIds.size >= 2;
-  const canUngroup  = selectedEls.some(el => el.groupId);
-
-  // Layers shown top-to-bottom = highest z → lowest z
   const layersReversed = [...elements].reverse();
 
-  // ── Layer drag handlers ────────────────────────────────────
+  const filteredIcons = iconSearch.trim()
+    ? FA_ICONS.filter(n => n.includes(iconSearch.toLowerCase()))
+    : FA_ICONS;
+
+  // ── Layer drag-to-reorder handlers ────────────────────────
   const onLayerDragStart = (e, id) => {
-    // Use a separate key so it doesn't conflict with element drops on artboard
     e.dataTransfer.setData('layerDragId', id);
     e.dataTransfer.effectAllowed = 'move';
     setDropInfo({ draggedId: id, targetId: null, position: null });
   };
-
   const onLayerDragOver = (e, targetId) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    const rect     = e.currentTarget.getBoundingClientRect();
-    const position = e.clientY < rect.top + rect.height / 2 ? 'above' : 'below';
-    setDropInfo(prev => ({ ...prev, targetId, position }));
+    const pos = e.clientY < e.currentTarget.getBoundingClientRect().top + e.currentTarget.getBoundingClientRect().height / 2 ? 'above' : 'below';
+    setDropInfo(prev => ({ ...prev, targetId, position: pos }));
   };
-
   const onLayerDragLeave = (e) => {
-    // Only clear if we actually left the row (not moved to a child)
-    if (!e.currentTarget.contains(e.relatedTarget)) {
+    if (!e.currentTarget.contains(e.relatedTarget))
       setDropInfo(prev => ({ ...prev, targetId: null, position: null }));
-    }
   };
-
   const onLayerDrop = (e, targetId) => {
     e.preventDefault();
     const draggedId = e.dataTransfer.getData('layerDragId');
-    if (draggedId && draggedId !== targetId) {
-      // 'above' in panel = higher z = insert AFTER target in array
-      // 'below' in panel = lower z  = insert BEFORE target in array
-      const insertBefore = dropInfo.position === 'below';
-      onLayerReorder(draggedId, targetId, insertBefore);
-    }
+    if (draggedId && draggedId !== targetId)
+      onLayerReorder(draggedId, targetId, dropInfo.position === 'below');
     setDropInfo({ draggedId: null, targetId: null, position: null });
   };
-
-  const onLayerDragEnd = () => {
-    setDropInfo({ draggedId: null, targetId: null, position: null });
-  };
+  const onLayerDragEnd = () => setDropInfo({ draggedId: null, targetId: null, position: null });
 
   return (
     <aside className="flex flex-col bg-white border-r border-slate-200 flex-shrink-0 overflow-hidden" style={{ width: 260 }}>
 
-      {/* ── Brand header ── */}
+      {/* Brand */}
       <div className="px-5 py-4 border-b border-slate-100 flex-shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
@@ -111,170 +89,131 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* ── Group + Snap toolbar ── */}
-      <div className="px-3 py-2.5 border-b border-slate-100 flex gap-2 flex-shrink-0">
-        <button
-          onClick={onGroup} disabled={!canGroup}
-          title="Group selected (need ≥2)"
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-xs font-medium transition-all
-            ${canGroup ? 'bg-violet-50 border-violet-200 text-violet-600 hover:bg-violet-100 cursor-pointer'
-                       : 'bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed'}`}
-        >
-          <Group size={13} /> Group
-        </button>
-        <button
-          onClick={onUngroup} disabled={!canUngroup}
-          title="Ungroup selected"
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-xs font-medium transition-all
-            ${canUngroup ? 'bg-violet-50 border-violet-200 text-violet-600 hover:bg-violet-100 cursor-pointer'
-                         : 'bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed'}`}
-        >
-          <Ungroup size={13} /> Ungroup
-        </button>
-        {/* Snap toggle */}
-        <button
-          onClick={onToggleSnap}
-          title={snapEnabled ? 'Snap ON — click to disable' : 'Snap OFF — click to enable'}
-          className={`flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all flex-shrink-0
-            ${snapEnabled
-              ? 'bg-blue-500 border-blue-500 text-white hover:bg-blue-600'
-              : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100'}`}
-        >
-          <Magnet size={13} />
-        </button>
-      </div>
-
-      {/* ── Scrollable body ── */}
+      {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto min-h-0">
 
-        {/* Elements palette */}
-        <div className="px-5 pt-4 pb-2">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Elements</p>
+        {/* ── Shapes palette ── */}
+        <div className="px-5 pt-4 pb-1">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Elements</p>
         </div>
-        <div className="px-3">
-          <div className="space-y-1">
-            {SIDEBAR_TOOLS.map((tool) => {
+        <div className="px-3 pb-2">
+          <div className="grid grid-cols-2 gap-1">
+            {SIDEBAR_TOOLS.map(tool => {
               const Icon = tool.icon;
               return (
                 <div
                   key={tool.type}
                   draggable
-                  onDragStart={(e) => handleToolDragStart(e, tool.type)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-grab active:cursor-grabbing
+                  onDragStart={e => handleToolDragStart(e, tool.type)}
+                  className="flex items-center gap-2 px-2 py-2 rounded-xl cursor-grab active:cursor-grabbing
                     hover:bg-slate-50 border border-transparent hover:border-slate-200
                     transition-all duration-150 group select-none"
                 >
-                  <div className={`w-9 h-9 rounded-lg ${tool.preview} flex items-center justify-center flex-shrink-0 shadow-sm`}>
-                    <Icon size={16} className={tool.iconColor} />
+                  <div className={`w-7 h-7 rounded-lg ${tool.preview} flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                    <Icon size={13} className={tool.iconColor} />
                   </div>
-                  <span className="text-sm text-slate-600 font-medium group-hover:text-slate-800 transition-colors">
+                  <span className="text-xs text-slate-600 font-medium group-hover:text-slate-800 transition-colors truncate">
                     {tool.label}
                   </span>
-                  <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                    <svg className="w-3.5 h-3.5 text-slate-300" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm8-16a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
-                    </svg>
-                  </div>
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* ── Layer panel ── */}
-        <div className="px-5 pt-5 pb-2 flex items-center justify-between">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Layers</p>
-          <span className="text-xs text-slate-300">{elements.length}</span>
+        {/* ── Icons palette ── */}
+        <div className="px-5 pt-3 pb-1">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Icons</p>
+          <div className="relative">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              value={iconSearch}
+              onChange={e => setIconSearch(e.target.value)}
+              placeholder="Search icons…"
+              className="w-full pl-7 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 focus:bg-white transition-colors"
+            />
+          </div>
+        </div>
+        <div className="px-3 pb-3">
+          <div className="grid grid-cols-6 gap-1 max-h-36 overflow-y-auto pr-1">
+            {filteredIcons.slice(0, 120).map(name => (
+              <div
+                key={name}
+                draggable
+                title={name}
+                onDragStart={e => handleToolDragStart(e, 'fa_icon', { iconName: name })}
+                className="flex flex-col items-center justify-center aspect-square rounded-lg border border-transparent
+                  hover:bg-blue-50 hover:border-blue-200 cursor-grab active:cursor-grabbing
+                  transition-all group select-none p-1"
+              >
+                <i className={`fa-solid fa-${name} text-slate-500 group-hover:text-blue-500`} style={{ fontSize: 16 }} />
+              </div>
+            ))}
+            {filteredIcons.length === 0 && (
+              <div className="col-span-6 py-3 text-center text-xs text-slate-300">No icons found</div>
+            )}
+          </div>
         </div>
 
+        {/* ── Layer panel ── */}
+        <div className="px-5 pt-3 pb-1 flex items-center justify-between">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Layers</p>
+          <span className="text-xs text-slate-300">{elements.length}</span>
+        </div>
         <div className="px-3 pb-3">
           {elements.length === 0 ? (
-            <p className="text-xs text-slate-300 text-center py-4">No layers yet</p>
+            <p className="text-xs text-slate-300 text-center py-3">No layers yet</p>
           ) : (
             <div className="space-y-0.5">
-              {layersReversed.map((el) => {
-                const Icon       = TYPE_ICONS[el.type] || Square;
+              {layersReversed.map(el => {
+                const Icon = TYPE_ICONS[el.type] || Square;
                 const isSelected = selectedIds.has(el.id);
                 const isBeingDragged = dropInfo.draggedId === el.id;
-                const cfg        = ELEMENT_CONFIG[el.type];
-
-                // Drop indicator: blue line above or below this row
+                const cfg = ELEMENT_CONFIG[el.type];
                 const showAbove = dropInfo.targetId === el.id && dropInfo.position === 'above';
                 const showBelow = dropInfo.targetId === el.id && dropInfo.position === 'below';
 
                 return (
                   <div key={el.id} className="relative">
-                    {/* Drop indicator — ABOVE */}
-                    {showAbove && (
-                      <div className="absolute -top-px left-2 right-2 h-0.5 bg-blue-400 rounded-full z-10 pointer-events-none" />
-                    )}
-
+                    {showAbove && <div className="absolute -top-px left-2 right-2 h-0.5 bg-blue-400 rounded-full z-10 pointer-events-none" />}
                     <div
                       draggable
-                      onDragStart={(e) => onLayerDragStart(e, el.id)}
-                      onDragOver={(e) => onLayerDragOver(e, el.id)}
+                      onDragStart={e => onLayerDragStart(e, el.id)}
+                      onDragOver={e => onLayerDragOver(e, el.id)}
                       onDragLeave={onLayerDragLeave}
-                      onDrop={(e) => onLayerDrop(e, el.id)}
+                      onDrop={e => onLayerDrop(e, el.id)}
                       onDragEnd={onLayerDragEnd}
                       onClick={() => onSelect(el.id, false)}
                       className={`flex items-center gap-1.5 px-1.5 py-1.5 rounded-lg transition-all select-none
-                        ${isBeingDragged ? 'opacity-40' : 'opacity-100'}
-                        ${isSelected
-                          ? 'bg-blue-50 border border-blue-200'
-                          : 'hover:bg-slate-50 border border-transparent'}
-                      `}
+                        ${isBeingDragged ? 'opacity-40' : ''}
+                        ${isSelected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50 border border-transparent'}`}
                     >
-                      {/* Drag handle */}
-                      <div
-                        className="flex-shrink-0 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 transition-colors px-0.5"
-                        title="Drag to reorder"
-                        onClick={e => e.stopPropagation()}
-                      >
+                      <div className="flex-shrink-0 cursor-grab text-slate-300 hover:text-slate-500 px-0.5" onClick={e => e.stopPropagation()}>
                         <GripVertical size={12} />
                       </div>
-
-                      {/* Type icon */}
-                      <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0
-                        ${isSelected ? 'bg-blue-100' : 'bg-slate-100'}`}>
-                        <Icon size={11} className={isSelected ? 'text-blue-500' : 'text-slate-400'} />
-                      </div>
-
-                      {/* Label + group badge */}
+                      {el.type === 'fa_icon' ? (
+                        <div className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 bg-slate-100">
+                          <i className={`fa-solid fa-${el.iconName} text-slate-400`} style={{ fontSize: 11 }} />
+                        </div>
+                      ) : (
+                        <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-blue-100' : 'bg-slate-100'}`}>
+                          <Icon size={11} className={isSelected ? 'text-blue-500' : 'text-slate-400'} />
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
-                        <span className={`text-xs font-medium truncate block
-                          ${isSelected ? 'text-blue-700' : 'text-slate-600'}`}>
-                          {cfg?.label ?? el.type}
+                        <span className={`text-xs font-medium truncate block ${isSelected ? 'text-blue-700' : 'text-slate-600'}`}>
+                          {el.type === 'fa_icon' ? el.iconName : (cfg?.label ?? el.type)}
                         </span>
-                        {el.groupId && (
-                          <span className="text-[9px] text-purple-400 font-semibold uppercase tracking-wide">group</span>
-                        )}
+                        {el.groupId && <span className="text-[9px] text-purple-400 font-semibold uppercase tracking-wide">group</span>}
                       </div>
-
-                      {/* Front / Back + Delete — shown when selected */}
-                      <div
-                        className={`flex gap-0.5 flex-shrink-0 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <button onClick={() => onLayerMove(el.id, 'front')} title="Bring to front"
-                          className="p-0.5 rounded hover:bg-blue-100 text-slate-400 hover:text-blue-600 transition-colors">
-                          <ChevronsUp size={11} />
-                        </button>
-                        <button onClick={() => onLayerMove(el.id, 'back')} title="Send to back"
-                          className="p-0.5 rounded hover:bg-blue-100 text-slate-400 hover:text-blue-600 transition-colors">
-                          <ChevronsDown size={11} />
-                        </button>
+                      <div className={`flex gap-0.5 flex-shrink-0 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0'}`} onClick={e => e.stopPropagation()}>
+                        <button onClick={() => onLayerMove(el.id, 'front')} title="Front" className="p-0.5 rounded hover:bg-blue-100 text-slate-400 hover:text-blue-600 transition-colors"><ChevronsUp size={11} /></button>
+                        <button onClick={() => onLayerMove(el.id, 'back')}  title="Back"  className="p-0.5 rounded hover:bg-blue-100 text-slate-400 hover:text-blue-600 transition-colors"><ChevronsDown size={11} /></button>
                         <div className="w-px bg-slate-200 mx-0.5" />
-                        <button onClick={() => onDeleteElement(el.id)} title="Delete"
-                          className="p-0.5 rounded hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors">
-                          <X size={11} />
-                        </button>
+                        <button onClick={() => onDeleteElement(el.id)} title="Delete" className="p-0.5 rounded hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors"><X size={11} /></button>
                       </div>
                     </div>
-
-                    {/* Drop indicator — BELOW */}
-                    {showBelow && (
-                      <div className="absolute -bottom-px left-2 right-2 h-0.5 bg-blue-400 rounded-full z-10 pointer-events-none" />
-                    )}
+                    {showBelow && <div className="absolute -bottom-px left-2 right-2 h-0.5 bg-blue-400 rounded-full z-10 pointer-events-none" />}
                   </div>
                 );
               })}
@@ -283,19 +222,15 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* ── Bottom actions ── */}
-      <div className="border-t border-slate-100 px-4 py-4 space-y-2 flex-shrink-0">
+      {/* Bottom actions */}
+      <div className="border-t border-slate-100 px-4 py-3 space-y-1.5 flex-shrink-0">
         <button onClick={onClearAll}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
-            text-sm font-medium text-red-500 bg-red-50 border border-red-100
-            hover:bg-red-100 hover:border-red-200 transition-all duration-150">
-          <Trash2 size={15} /> Clear All
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-red-500 bg-red-50 border border-red-100 hover:bg-red-100 transition-all">
+          <Trash2 size={14} /> Clear All
         </button>
         <button onClick={handleChangeScreen}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
-            text-sm font-medium text-slate-600 bg-slate-50 border border-slate-200
-            hover:bg-slate-100 hover:border-slate-300 transition-all duration-150">
-          <Monitor size={15} /> Change Screen
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-slate-600 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-all">
+          <Monitor size={14} /> Change Screen
         </button>
       </div>
     </aside>

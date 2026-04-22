@@ -7,8 +7,9 @@ export const ELEMENT_CONFIG = {
   text_placeholder: { defaultWidth:180, defaultHeight:40,  label:'Text Placeholder',  className:'bg-amber-50 border border-amber-300 rounded flex items-center px-3',             textClass:'text-amber-400 text-xs italic select-none' },
   button:           { defaultWidth:110, defaultHeight:38,  label:'Button',            className:'bg-blue-500 rounded-lg flex items-center justify-center shadow-sm',              textClass:'text-white text-sm font-semibold select-none' },
   image_placeholder:{ defaultWidth:160, defaultHeight:110, label:'Image Placeholder', className:'bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center gap-1', textClass:'text-slate-400 text-xs select-none' },
-  circle:           { defaultWidth:100, defaultHeight:100, label:'Circle',            renderShape:'circle' },
+  circle:           { defaultWidth:100, defaultHeight:100, label:'Circle',            renderShape:'circle'   },
   triangle:         { defaultWidth:100, defaultHeight:86,  label:'Triangle',          renderShape:'triangle' },
+  fa_icon:          { defaultWidth:60,  defaultHeight:60,  label:'Icon',              renderShape:'fa_icon'  },
 };
 
 // ── Resize handle helpers ─────────────────────────────────────
@@ -27,12 +28,21 @@ function handlePos(dir, w, h) {
 }
 
 // ── Shape renderers ────────────────────────────────────────────
-function ShapeContent({ element, config }) {
+function ShapeContent({ element, config, elW, elH }) {
   const fill = element.fillColor;
   if (config.renderShape === 'circle') {
     return (
       <div style={{ position:'absolute', inset:0, borderRadius:'50%', background: fill || '#e2e8f0', border:'1.5px solid #94a3b8', display:'flex', alignItems:'center', justifyContent:'center' }}>
         <span className="text-slate-500 text-xs font-medium select-none">Circle</span>
+      </div>
+    );
+  }
+  if (config.renderShape === 'fa_icon') {
+    const sz = Math.min(elW, elH) * 0.55;
+    return (
+      <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <i className={`fa-solid fa-${element.iconName || 'star'}`}
+           style={{ fontSize: sz, color: fill || '#64748b' }} />
       </div>
     );
   }
@@ -144,7 +154,7 @@ export default function ArtboardElement({
       style={{ left:element.x, top:element.y, width:elW, height:elH, userSelect:'none', ...groupStyle, ...selectionStyle, ...fillOverride, ...opacityStyle }}
       title={config.label}
     >
-      <ShapeContent element={element} config={config} />
+      <ShapeContent element={element} config={config} elW={elW} elH={elH} />
 
       {/* Group badge */}
       {element.groupId && (

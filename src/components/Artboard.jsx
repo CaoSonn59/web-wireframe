@@ -171,7 +171,8 @@ export default function Artboard({
   // ── Drop from sidebar ──────────────────────────────────────
   const handleDrop = useCallback((e) => {
     e.preventDefault();
-    const type = e.dataTransfer.getData('elementType');
+    const type     = e.dataTransfer.getData('elementType');
+    const iconName = e.dataTransfer.getData('iconName') || null;
     if (!type) return;
     const rect  = artboardRef.current.getBoundingClientRect();
     const scale = viewTransform.scale;
@@ -189,6 +190,7 @@ export default function Artboard({
       type, x, y, groupId: null,
       width:  cfg.defaultWidth  ?? 100,
       height: cfg.defaultHeight ?? 60,
+      ...(iconName ? { iconName } : {}),
     }]);
   }, [viewTransform.scale, boardSize, setElements]);
 

@@ -3,6 +3,7 @@ import { Undo2, Redo2 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import Artboard from './Artboard';
 import RightPanel from './RightPanel';
+import Toolbar from './Toolbar';
 import { useHistory } from '../hooks/useHistory';
 
 const ELEMENT_SIZES = {
@@ -194,17 +195,21 @@ export default function Workspace({ boardSize, onChangeScreen }) {
         onSelect={handleSelect}
         onClearAll={handleClearAll}
         onChangeScreen={onChangeScreen}
-        onGroup={handleGroup}
-        onUngroup={handleUngroup}
         onLayerMove={handleLayerMove}
         onDeleteElement={handleDeleteElement}
         onLayerReorder={handleLayerReorder}
-        snapEnabled={snapEnabled}
-        onToggleSnap={() => setSnapEnabled(s => !s)}
       />
 
-      {/* Artboard area — flex so inner flex-1 works */}
+      {/* Center column: Toolbar + Artboard */}
       <div className="flex-1 relative flex flex-col overflow-hidden">
+        <Toolbar
+          canGroup={selectedIds.size >= 2}
+          canUngroup={elements.filter(el => selectedIds.has(el.id)).some(el => el.groupId)}
+          onGroup={handleGroup}
+          onUngroup={handleUngroup}
+          snapEnabled={snapEnabled}
+          onToggleSnap={() => setSnapEnabled(s => !s)}
+        />
         <Artboard
           boardSize={boardSize}
           elements={elements}
