@@ -12,6 +12,18 @@ export default function Artboard({
   const isPanning     = useRef(false);
   const isSpaceHeld   = useRef(false);
   const lastMouse     = useRef({ x: 0, y: 0 });
+  // Dynamic <style> tag to override cursor on all children when panning
+  const cursorStyleEl = useRef(null);
+
+  const setCursor = (mode) => {
+    if (!cursorStyleEl.current) {
+      cursorStyleEl.current = document.createElement('style');
+      document.head.appendChild(cursorStyleEl.current);
+    }
+    if (mode === 'grab')    cursorStyleEl.current.textContent = '* { cursor: grab    !important; }';
+    else if (mode === 'grabbing') cursorStyleEl.current.textContent = '* { cursor: grabbing !important; }';
+    else                    cursorStyleEl.current.textContent = '';
+  };
 
   // ── Marquee selection state ────────────────────────────────
   const [selBox, setSelBox]     = useState(null); // { x1,y1,x2,y2 } in canvas space
@@ -52,14 +64,14 @@ export default function Artboard({
       if (e.code === 'Space' && !e.target.matches('input,textarea')) {
         e.preventDefault();
         isSpaceHeld.current = true;
-        if (containerRef.current) containerRef.current.style.cursor = 'grab';
+        setCursor('grab');
       }
     };
     const onKeyUp = (e) => {
       if (e.code === 'Space') {
         isSpaceHeld.current = false;
         isPanning.current   = false;
-        if (containerRef.current) containerRef.current.style.cursor = '';
+        setCursor(null);
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -75,7 +87,7 @@ export default function Artboard({
     if (isSpaceHeld.current) {
       isPanning.current = true;
       lastMouse.current = { x: e.clientX, y: e.clientY };
-      if (containerRef.current) containerRef.current.style.cursor = 'grabbing';
+      setCursor('grabbing');
       e.preventDefault();
     }
   }, []);
@@ -92,8 +104,7 @@ export default function Artboard({
   const handleMouseUp = useCallback(() => {
     if (isPanning.current) {
       isPanning.current = false;
-      if (containerRef.current)
-        containerRef.current.style.cursor = isSpaceHeld.current ? 'grab' : '';
+      setCursor(isSpaceHeld.current ? 'grab' : null);
     }
   }, []);
 
